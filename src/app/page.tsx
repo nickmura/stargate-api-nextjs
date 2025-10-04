@@ -160,8 +160,11 @@ export default function Home() {
   return (
     <div className="font-sans min-h-screen p-4 sm:p-8 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-lg mx-auto">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold mb-2">LiFi SDK/APP bridge (AcrossV4)</h1>
+        </div>
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-xl font-bold">Swap</h1>
+          <h2 className="text-xl font-bold">Swap</h2>
           <ConnectButton />
         </div>
 
@@ -171,7 +174,7 @@ export default function Home() {
             <button className="px-6 py-3 font-semibold border-b-2 border-blue-500 text-blue-500">
               Swap
             </button>
-            <button className="px-6 py-3 font-semibold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+            <button disabled className="px-6 py-3 font-semibold text-gray-500 opacity-40 cursor-not-allowed">
               Limit
             </button>
             <div className="ml-auto flex items-center gap-2 px-4">
@@ -281,9 +284,9 @@ export default function Home() {
             )}
 
             {/* Transaction Hash Display */}
-            <div className="mb-4">
+            {/* <div className="mb-4">
               <p className="text-xs text-gray-500 mb-2">Debug: txHashLink = {txHashLink || "null"}</p>
-            </div>
+            </div> */}
 
             {txHashLink && (
               <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
