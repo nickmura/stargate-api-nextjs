@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LI.FI API/SDK",
-  description: "Integration of LI.FI Protocol via SDK/API",
+  title: "Stargate API/SDK",
+  description: "Integration of Stargate (LayerZero) Protocol via SDK/API",
 };
 
 export default function RootLayout({

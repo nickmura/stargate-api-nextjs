@@ -161,7 +161,7 @@ export default function Home() {
     <div className="font-sans min-h-screen p-4 sm:p-8 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-lg mx-auto">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">LiFi SDK/APP bridge (AcrossV4)</h1>
+          <h1 className="text-2xl font-bold mb-2">Stargate Bridge</h1>
         </div>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Swap</h2>
