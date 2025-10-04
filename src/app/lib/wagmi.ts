@@ -112,6 +112,6 @@ export const config = createConfig({
   transports: chains.reduce((acc, chain) => ({
     ...acc,
     [chain.id]: http(),
-  }), {}),
+  }), {} as Record<number, ReturnType<typeof http>>),
   ssr: true,
 });

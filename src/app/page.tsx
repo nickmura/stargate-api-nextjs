@@ -34,7 +34,8 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [routeData, setRouteData] = useState<any>(null);
+  const [routeData, setRouteData] = useState<{ routes?: Array<{ toAmount?: string; steps?: Array<{ execution?: { process?: Array<{ txHash?: string }> } }> }>; error?: string } | null>(null);
+  const [txHashLink, setTxHashLink] = useState<string | null>(null);
 
   // Form state
   const [fromChainId, setFromChainId] = useState(8453); // Base
@@ -46,6 +47,7 @@ export default function Home() {
   const getQuote = async () => {
     setLoading(true);
     setRouteData(null);
+    setTxHashLink(null);
 
     try {
       const fromChainTokens = TOKENS[fromChainId as keyof typeof TOKENS];
@@ -82,7 +84,7 @@ export default function Home() {
 
       const data = await response.json();
       setRouteData(data);
-    } catch (error) {
+    } catch {
       setRouteData({ error: 'Failed to fetch route' });
     } finally {
       setLoading(false);
@@ -102,14 +104,18 @@ export default function Home() {
       console.log("Executing route:", route);
 
       // Execute the route using LI.FI SDK (provider is configured globally)
-      const executedRoute = await executeRoute(route, {
+      const executedRoute = await executeRoute(route as Parameters<typeof executeRoute>[0], {
         // Configure execution with inline settings
         infiniteApproval: false,
 
         // Hook that gets called when route updates
         updateRouteHook(updatedRoute) {
-          console.log("Route update:", updatedRoute);
-          // You can update UI here with progress
+          console.log("Route update:", updatedRoute );
+          // Extract transaction link from route updates
+          const txLink = updatedRoute?.steps?.[0]?.execution?.internalTxLink;
+          if (txLink) {
+            setTxHashLink(txLink);
+          }
         },
 
         // Hook for accepting exchange rate updates
@@ -121,7 +127,12 @@ export default function Home() {
       });
 
       console.log("Executed route:", executedRoute);
-      alert(`Trade executed successfully!`);
+      console.log("Executed route (tx link/hashes)", executedRoute?.steps?.[0]?.execution?.internalTxLink)
+      // Extract transaction hash from the executed route
+      const txHashLink = executedRoute?.steps?.[0]?.execution?.internalTxLink
+      if (txHashLink) {
+        setTxHashLink(txHashLink);
+      }
 
       // Update route data with execution results
       setRouteData({
@@ -264,6 +275,36 @@ export default function Home() {
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transaction Hash Display */}
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2">Debug: txHashLink = {txHashLink || "null"}</p>
+            </div>
+
+            {txHashLink && (
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-green-700 dark:text-green-400 mb-1">
+                      Trade Executed Successfully
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={txHashLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-green-600 dark:text-green-400 hover:underline truncate"
+                      >
+                        View Transaction →
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
