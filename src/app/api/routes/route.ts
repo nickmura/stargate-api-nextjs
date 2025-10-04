@@ -63,6 +63,11 @@ export async function POST(request: Request) {
     // Stargate returns an array of quotes, pick the first one
     const quote = Array.isArray(data.quotes) ? data.quotes[0] : data;
 
+    console.log('Quote steps:', JSON.stringify(quote?.steps, null, 2));
+
+    // Stargate returns all steps needed for the transfer
+    const allSteps = quote?.steps || [];
+
     // Transform Stargate response to match LiFi format expected by frontend
     const transformedData = {
       routes: [{
@@ -70,7 +75,10 @@ export async function POST(request: Request) {
         fromAmount: body.fromAmount,
         fromChainId: body.fromChainId,
         toChainId: body.toChainId,
-        steps: [],
+        // Include all steps from Stargate (approval, transfer, etc.)
+        stargateSteps: allSteps,
+        // Also include the full quote for debugging
+        fullQuote: quote,
       }]
     };
 

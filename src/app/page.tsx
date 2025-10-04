@@ -1,40 +1,27 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useState, useEffect } from "react";
-import { useAccount, useWalletClient, useSwitchChain } from "wagmi";
-import { createConfig, executeRoute, EVM } from "@lifi/sdk";
+import { useState } from "react";
+import { useAccount, useWalletClient } from "wagmi";
 import { TokenSelector } from "./components/TokenSelector";
 import { TOKENS } from "./lib/tokens";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const { switchChainAsync } = useSwitchChain();
-
-  // Configure LI.FI SDK when wallet client changes
-  useEffect(() => {
-    if (walletClient) {
-      createConfig({
-        integrator: 'Li.Fi API',
-        providers: [
-          EVM({
-            getWalletClient: async () => walletClient,
-            switchChain: async (chainId: number) => {
-              if (switchChainAsync) {
-                await switchChainAsync({ chainId });
-              }
-              return walletClient;
-            },
-          }),
-        ],
-      });
-    }
-  }, [walletClient, switchChainAsync]);
 
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [routeData, setRouteData] = useState<{ routes?: Array<{ toAmount?: string; steps?: Array<{ execution?: { process?: Array<{ txHash?: string }> } }> }>; error?: string } | null>(null);
+  const [routeData, setRouteData] = useState<{
+    routes?: Array<{
+      toAmount?: string;
+      stargateSteps?: Array<{
+        type: string;
+        transaction?: { to?: `0x${string}`; data?: `0x${string}`; value?: string };
+      }>;
+    }>;
+    error?: string
+  } | null>(null);
   const [txHashLink, setTxHashLink] = useState<string | null>(null);
 
   // Form state
@@ -93,7 +80,7 @@ export default function Home() {
 
   const executeSwap = async () => {
     if (!isConnected || !routeData?.routes?.[0]) {
-      alert("Please connect wallet and get a quote first");
+      console.error("Please connect wallet and get a quote first");
       return;
     }
 
@@ -103,45 +90,80 @@ export default function Home() {
       const route = routeData.routes[0];
       console.log("Executing route:", route);
 
-      // Execute the route using LI.FI SDK (provider is configured globally)
-      const executedRoute = await executeRoute(route as Parameters<typeof executeRoute>[0], {
-        // Configure execution with inline settings
-        infiniteApproval: false,
+      // Get all Stargate steps from the quote
+      const stargateSteps = (route as { stargateSteps?: Array<{ type: string; transaction?: { to?: `0x${string}`; data?: `0x${string}`; value?: string } }> }).stargateSteps || [];
 
-        // Hook that gets called when route updates
-        updateRouteHook(updatedRoute) {
-          console.log("Route update:", updatedRoute );
-          // Extract transaction link from route updates
-          const txLink = updatedRoute?.steps?.[0]?.execution?.internalTxLink;
-          if (txLink) {
-            setTxHashLink(txLink);
-          }
-        },
+      console.log("Full route object:", JSON.stringify(route, null, 2));
+      console.log("Stargate steps:", stargateSteps);
+      console.log("Wallet client exists:", !!walletClient);
 
-        // Hook for accepting exchange rate updates
-        acceptExchangeRateUpdateHook(params) {
-          console.log("Exchange rate update:", params);
-          // Auto-accept rate updates (or show modal to user)
-          return Promise.resolve(true);
-        },
-      });
-
-      console.log("Executed route:", executedRoute);
-      console.log("Executed route (tx link/hashes)", executedRoute?.steps?.[0]?.execution?.internalTxLink)
-      // Extract transaction hash from the executed route
-      const txHashLink = executedRoute?.steps?.[0]?.execution?.internalTxLink
-      if (txHashLink) {
-        setTxHashLink(txHashLink);
+      if (!stargateSteps.length || !walletClient) {
+        console.error("Missing steps or wallet:", { stepsCount: stargateSteps.length, walletClient: !!walletClient });
+        console.error(`Missing transaction steps or wallet client`);
+        setExecuting(false);
+        return;
       }
 
-      // Update route data with execution results
-      setRouteData({
-        ...routeData,
-        routes: [executedRoute],
-      });
+      // Execute each step sequentially
+      const txHashes: string[] = [];
+
+      for (let i = 0; i < stargateSteps.length; i++) {
+        const step = stargateSteps[i];
+        console.log(`\n--- Executing Step ${i + 1}/${stargateSteps.length}: ${step.type} ---`);
+        console.log("Step data:", JSON.stringify(step, null, 2));
+
+        const transaction = step.transaction;
+        if (!transaction) {
+          console.warn(`Step ${i + 1} has no transaction data, skipping`);
+          continue;
+        }
+
+        const txData = {
+          to: transaction.to,
+          data: transaction.data,
+          value: BigInt(transaction.value || '0'),
+          chain: walletClient.chain,
+          account: address as `0x${string}`,
+        };
+
+        console.log(`Transaction data for step ${i + 1}:`, txData);
+
+        // Send the transaction
+        const txHash = await walletClient.sendTransaction(txData);
+        console.log(`Step ${i + 1} transaction sent! Hash:`, txHash);
+        txHashes.push(txHash);
+      }
+
+      console.log("\n=== All transactions completed ===");
+      console.log("Transaction hashes:", txHashes);
+
+      // Create block explorer link based on chain (use last tx hash)
+      const getExplorerUrl = (chainId: number, hash: string) => {
+        const explorers: Record<number, string> = {
+          1: 'https://etherscan.io',
+          137: 'https://polygonscan.com',
+          42161: 'https://arbiscan.io',
+          10: 'https://optimistic.etherscan.io',
+          8453: 'https://basescan.org',
+          56: 'https://bscscan.com',
+          43114: 'https://snowtrace.io',
+        };
+        return `${explorers[chainId] || 'https://etherscan.io'}/tx/${hash}`;
+      };
+
+      const lastTxHash = txHashes[txHashes.length - 1];
+      const txLink = getExplorerUrl(fromChainId, lastTxHash);
+
+      // Create LayerZero Scan link for cross-chain tracking
+      const layerZeroScanLink = `https://layerzeroscan.com/tx/${lastTxHash}`;
+
+      setTxHashLink(layerZeroScanLink);
+
+      console.log(`All transactions sent! Final hash: ${lastTxHash}`);
+      console.log(`Track cross-chain status: ${layerZeroScanLink}`);
     } catch (error) {
       console.error("Execution error:", error);
-      alert(`Failed to execute: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`Failed to execute: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setExecuting(false);
     }
